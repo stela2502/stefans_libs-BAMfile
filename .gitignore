@@ -1,2 +1,8 @@
 /.includepath
 /.project
+/blib/
+/META.yml
+/MYMETA.json
+/MYMETA.yml
+/Makefile
+/pm_to_blib
