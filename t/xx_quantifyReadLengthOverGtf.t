@@ -32,7 +32,7 @@ $gtf =  "$plugin_path/data/Small.gtf";
 
 ok ( -f $gtf, "gtf file $gtf exists" );
 
-@options = ( 'quantify_on', 'gene' );
+@options = ( 'quantify_on', 'gene', 'dist_from_feature_start', -2 );
 
 my $cmd =
     "perl -I $plugin_path/../lib  $exec "

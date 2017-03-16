@@ -20,19 +20,18 @@
 =head1  SYNOPSIS
 
     quantifyReadLengthOverGtf.pl
-       -bams     :<please add some info!> you can specify more entries to that
-       -options  :<please add some info!> you can specify more entries to that
-          
-dist_from_feature_start:how far from the feature start may the read start (default 1bp)
+       -bams     :a list of bam files you want to get analyzed
+       -options  :  
+ dist_from_feature_start:how far from the feature start may the read start (default 1bp)
         size_fractions: e.g. "20 40" (default) or "15 30 50" 
                         to report the reads in lengt of below 20 below 40 or above 40
                         or below 15, below 30, below 50 or more than 50
            quantify_on: which feature to select for quantification from the gtf file (default 'exon')
              report_on: which column in the gtf file object to report on (default 'gene_id')
-                        
-                         format: key_1 value_1 key_2 value_2 ... key_n value_n
-       -gtf       :<please add some info!>
-       -outfile       :<please add some info!>
+          slice_length: change the sice of the feature matching objects (default 5e+6)      
+
+       -gtf       :the gtf file with the features to quantify
+       -outfile   :the outfile (a tab separated table)
 
 
        -help           :print this help
@@ -60,51 +59,49 @@ my $plugin_path = "$FindBin::Bin";
 
 my $VERSION = 'v1.0';
 
-
-my ( $help, $debug, $database, @bams, $options, @options, $gtf, $outfile);
+my ( $help, $debug, $database, @bams, $options, @options, $gtf, $outfile );
 
 Getopt::Long::GetOptions(
-       "-bams=s{,}"    => \@bams,
-       "-options=s{,}"    => \@options,
-	 "-gtf=s"    => \$gtf,
-	 "-outfile=s"    => \$outfile,
+	"-bams=s{,}"    => \@bams,
+	"-options=s{,}" => \@options,
+	"-gtf=s"        => \$gtf,
+	"-outfile=s"    => \$outfile,
 
-	 "-help"             => \$help,
-	 "-debug"            => \$debug
+	"-help"  => \$help,
+	"-debug" => \$debug
 );
 
-my $warn = '';
+my $warn  = '';
 my $error = '';
 
-unless ( defined $bams[0]) {
+unless ( defined $bams[0] ) {
 	$error .= "the cmd line switch -bams is undefined!\n";
 }
-unless ( defined $options[0]) {
+unless ( defined $options[0] ) {
 	$warn .= "the cmd line switch -options is undefined!\n";
 }
-unless ( defined $gtf) {
+unless ( defined $gtf ) {
 	$error .= "the cmd line switch -gtf is undefined!\n";
 }
-unless ( defined $outfile) {
+unless ( defined $outfile ) {
 	$error .= "the cmd line switch -outfile is undefined!\n";
 }
 
-
-if ( $help ){
-	print helpString( ) ;
+if ($help) {
+	print helpString();
 	exit;
 }
 
-if ( $error =~ m/\w/ ){
-	helpString($error ) ;
+if ( $error =~ m/\w/ ) {
+	helpString($error);
 	exit;
 }
 
 sub helpString {
 	my $errorMessage = shift;
-	$errorMessage = ' ' unless ( defined $errorMessage); 
+	$errorMessage = ' ' unless ( defined $errorMessage );
 	print "$errorMessage.\n";
-	pod2usage(q(-verbose) => 1);
+	pod2usage( q(-verbose) => 1 );
 }
 
 ### initialize default options:
@@ -113,43 +110,49 @@ sub helpString {
 
 ###
 
+my ($task_description);
 
-my ( $task_description);
-
-$task_description .= 'perl '.$plugin_path .'/quantifyReadLengthOverGtf.pl';
-$task_description .= ' -bams "'.join( '" "', @bams ).'"' if ( defined $bams[0]);
-$task_description .= ' -options "'.join( '" "', @options ).'"' if ( defined $options[0]);
-$task_description .= " -gtf '$gtf'" if (defined $gtf);
-$task_description .= " -outfile '$outfile'" if (defined $outfile);
-
+$task_description .= 'perl ' . $plugin_path . '/quantifyReadLengthOverGtf.pl';
+$task_description .= ' -bams "' . join( '" "', @bams ) . '"'
+  if ( defined $bams[0] );
+$task_description .= ' -options "' . join( '" "', @options ) . '"'
+  if ( defined $options[0] );
+$task_description .= " -gtf '$gtf'"         if ( defined $gtf );
+$task_description .= " -outfile '$outfile'" if ( defined $outfile );
 
 for ( my $i = 0 ; $i < @options ; $i += 2 ) {
 	$options[ $i + 1 ] =~ s/\n/ /g;
 	$options->{ $options[$i] } = $options[ $i + 1 ];
 }
 ###### default options ########
-$options->{'quantify_on'} ||= 'exon';
-$options->{'report_on'}   ||= 'gene_id';
+$options->{'quantify_on'}    ||= 'exon';
+$options->{'report_on'}      ||= 'gene_id';
 $options->{'size_fractions'} ||= "20 40";
-$options->{'size_fractions'} = [ split( " ", $options->{'size_fractions'})];
+$options->{'size_fractions'} = [ split( " ", $options->{'size_fractions'} ) ];
 $options->{'dist_from_feature_start'} = 1;
+$options->{'slice_length'} ||= 5e+6;
 ##############################
-my $fm = root->filemap( $outfile );
-mkdir( $fm->{'path'}) unless ( -d $fm->{'path'} );
+my $fm = root->filemap($outfile);
+mkdir( $fm->{'path'} ) unless ( -d $fm->{'path'} );
 
-open ( LOG , ">$outfile.log") or die "I could not open the log file '$outfile.log'\n".$!;
-print LOG $task_description."\n";
-close ( LOG );
+open( LOG, ">$outfile.log" )
+  or die "I could not open the log file '$outfile.log'\n" . $!;
+print LOG $task_description . "\n";
+close(LOG);
 
-my (@matching_Hashes, $runs, $sample_table, $sample_row, $result,@matching_IDs, $N, $Seq, $sample_name, $self);
-$runs = 0;
-$self = {}; # the local script variables stash
-$sample_table =data_table ->new();
-$sample_table -> add_column('filename' => @bams );
-$sample_table ->Add_2_Header(['mapped', 'in gene', 'unmapped']);
+my (
+	@matching_Hashes, $runs,         $sample_table, $sample_row,
+	$result,          @matching_IDs, $N,            $Seq,
+	$sample_name,     $self
+);
+$runs         = 0;
+$self         = {'chr' => ''};                  # the local script variables stash
+$sample_table = data_table->new();
+$sample_table->add_column( 'filename' => @bams );
+$sample_table->Add_2_Header( [ 'mapped', 'in gene', 'unmapped' ] );
 
 $result = data_table->new();
-$result ->Add_2_Header ( ['Gene_ID' ] );
+$result->Add_2_Header( ['Gene_ID'] );
 
 my $gtf_obj = stefans_libs::file_readers::gtf_file->new();
 
@@ -158,15 +161,17 @@ $gtf_obj->read_file($gtf);
 my $quantifer =
   $gtf_obj->select_where( 'feature',
 	sub { $_[0] eq $options->{'quantify_on'} } );
+$quantifer->{'slice_length'} = $options->{'slice_length'};
 
-
+my @bam_line;
 
 sub filter {
-	my $BAM_file = shift;
+	my $BAM_file    = shift;
 	my $sample_name = $BAM_file->{'tmp_sample_name'};
-	my $sample_row = $BAM_file->{'tmp_sample_row'};
-	#Carp::confess ( "I hope the sample name '$sample_name' is a bam filename\n"); 
-	my @bam_line = split( "\t", shift );
+	my $sample_row  = $BAM_file->{'tmp_sample_row'};
+
+  #Carp::confess ( "I hope the sample name '$sample_name' is a bam filename\n");
+	@bam_line = split( "\t", shift );
 	return if ( $bam_line[0] =~ m/^\@/ );
 	$runs++;
 
@@ -175,41 +180,75 @@ sub filter {
 	}
 
 	unless ( $bam_line[2] =~ m/^chr/ ) {
-		@{ @{ $sample_table->{'data'} }[$BAM_file->{'tmp_sample_row'}] }[3]++;
+		@{ @{ $sample_table->{'data'} }[ $BAM_file->{'tmp_sample_row'} ] }[3]++;
 		return;
 	}
 	else {
-		@{ @{ $sample_table->{'data'} }[$BAM_file->{'tmp_sample_row'}] }[1]++;
+		@{ @{ $sample_table->{'data'} }[ $BAM_file->{'tmp_sample_row'} ] }[1]++;
 	}
 
 	## start with the real matching
 	@matching_IDs = &get_matching_ids( $quantifer, $bam_line[2], $bam_line[3] );
 
-	if ( @matching_IDs == 0 ){    ## no match to any gene / exon
-		#print "BAM line did not match to features - next\n";
+	if ( @matching_IDs == 0 ) {    ## no match to any gene / exon
+		    #print "BAM line did not match to features - next\n";
 		return;
 	}
 	@{ @{ $sample_table->{'data'} }[$sample_row] }[2]++;
 
 	@matching_Hashes = &get_reporter_hashes( $quantifer, @matching_IDs );
-	
+
 	## now I need to check if the read starts at the start of the feature
 	my @tmp;
 	foreach my $gtf_hash (@matching_Hashes) {
-		$N            = 0;
-		$Seq          = 0;
+		$N   = 0;
+		$Seq = 0;
 		map { $N   += $_ } $bam_line[5] =~ m/(\d+)N/g;
 		map { $Seq += $_ } $bam_line[5] =~ m/(\d+)M/g;
+
+#		warn
+#"$Seq,  $bam_line[2]:$gtf_hash->{'strand'}: abs($bam_line[3] - $gtf_hash->{start}) "
+#		  . abs( $bam_line[3] - $gtf_hash->{start} )
+#		  . " <= $options->{'dist_from_feature_start'}\n";
+#		warn
+#"$Seq,  $bam_line[2]:$gtf_hash->{'strand'}: abs(($bam_line[3]+ $Seq) - $gtf_hash->{end}) "
+#		  . abs( ( $bam_line[3] + $Seq ) - $gtf_hash->{end} )
+#		  . " <= $options->{'dist_from_feature_start'}\n";
+		if ( $N > $Seq ) {
+				warn "this can not be used here :-(:\n"
+				  . join( "\t", @bam_line ) . "\n";
+				next;    ## this can not be used here :-(
+		}
 		if ( $gtf_hash->{'strand'} eq "+" ) {
-			if ( abs($bam_line[3] - $gtf_hash->{start}) <= $options->{'dist_from_feature_start'} ) {
-				&add_to_summary( $BAM_file->{'tmp_sample_name'}, $gtf_hash->{$options->{'report_on'}}, $Seq );
+			if (
+				abs( $bam_line[3] - $gtf_hash->{start} ) <=
+				$options->{'dist_from_feature_start'} )
+			{
+				&add_to_summary( $BAM_file->{'tmp_sample_name'},
+					$gtf_hash->{ $options->{'report_on'} }, $Seq );
 			}
-		}else {
-			if ( $N > $Seq ) {
-				next; ## this can not be used here :-(
+			elsif (
+				abs( ( $bam_line[3] + $Seq ) - $gtf_hash->{end} ) <=
+				$options->{'dist_from_feature_start'} )
+			{    ## close to end
+				&add_to_summary( "$BAM_file->{'tmp_sample_name'} from end",
+					$gtf_hash->{ $options->{'report_on'} }, $Seq );
 			}
-			if ( abs(($bam_line[3]+ $Seq) - $gtf_hash->{end}) <= $options->{'dist_from_feature_start'} ) {
-				&add_to_summary( $BAM_file->{'tmp_sample_name'}, $gtf_hash->{$options->{'report_on'}}, $Seq );
+		}
+		else {
+			if (
+				abs( ( $bam_line[3] + $Seq ) - $gtf_hash->{end} ) <=
+				$options->{'dist_from_feature_start'} )
+			{
+				&add_to_summary( $BAM_file->{'tmp_sample_name'},
+					$gtf_hash->{ $options->{'report_on'} }, $Seq );
+			}
+			elsif (
+				abs( $bam_line[3] - $gtf_hash->{start} ) <=
+				$options->{'dist_from_feature_start'} )
+			{            ## colse to end
+				&add_to_summary( "$BAM_file->{'tmp_sample_name'} from end",
+					$gtf_hash->{ $options->{'report_on'} }, $Seq );
 			}
 		}
 	}
@@ -218,27 +257,43 @@ sub filter {
 
 my $bam_file = stefans_libs::BAMfile->new();
 
-foreach  $sample_name ( @bams ) {
-	$result->Add_2_Header([ map { "$sample_name $_" } @{$options->{'size_fractions'}}, 'larger' ]);
+$| = 1;## turn on autoflush for the process bar
+
+foreach $sample_name (@bams) {
+	$result->Add_2_Header(
+		[
+			(map { "$sample_name $_" } @{ $options->{'size_fractions'} },
+			'larger'),
+			(map { "$sample_name from end $_" }
+			  @{ $options->{'size_fractions'} },
+			'larger')
+		]
+	);
 	$sample_row = undef;
 	($sample_row) =
 	  $sample_table->get_rowNumbers_4_columnName_and_Entry( 'filename',
 		$sample_name );
 	$bam_file->{'tmp_sample_name'} = $sample_name;
-	$bam_file->{'tmp_sample_row'} = $sample_row;
+	$bam_file->{'tmp_sample_row'}  = $sample_row;
 	$bam_file->filter_file( $sample_name, \&filter );
 }
+$| = 0;## turn off autoflush
 
-
-$result->write_file ( $outfile );
-$sample_table -> write_file ( $fm->{'path'}.$fm->{'filename_base'}.'_sampleInfo');
-
+$result->write_file($outfile);
+$sample_table->write_file(
+	$fm->{'path'} ."/". $fm->{'filename_base'} . '_sampleInfo' );
 
 sub add_to_summary {
 	my ( $sampleID, $geneIDs, $read_length ) = @_;
 
-	my @col_number =
-	  $result->Header_Position( [ map { "$sampleID $_" } @{$options->{'size_fractions'}}, 'larger' ] );
+	#warn "add_to_summary: $sampleID $read_length\n";
+	my @colnames = map { "$sampleID $_" } @{ $options->{'size_fractions'} },
+	  'larger';
+	my @col_number = $result->Header_Position( \@colnames );
+	map {
+		Carp::confess("the col_number for sample $colnames[$_] is undefined\n")
+		  unless ( defined $col_number[$_] )
+	} 0 .. ( @col_number - 1 );
 	$geneIDs = [$geneIDs] unless ( ref($geneIDs) eq "ARRAY" );
 	my ( @row_numbers, $row, $added );
 	foreach my $gene_id (@$geneIDs) {
@@ -251,21 +306,27 @@ sub add_to_summary {
 		}
 		foreach my $row (@row_numbers) {
 			$added = 0;
-			for ( my $col_id = 0; $col_id < @col_number; $col_id++ ){
-				if ( $read_length < @{$options->{'size_fractions'}}[$col_id]) {
-					warn "I can add size @{$options->{'size_fractions'}}[$col_id] for gene $gene_id and read_length $read_length\n";
+			for ( my $col_id = 0 ; $col_id < @col_number - 1 ; $col_id++ ) {
+				if ( $read_length < @{ $options->{'size_fractions'} }[$col_id] )
+				{
+#				warn join( "\t", @bam_line )
+#				  . "\nI can add size @{$options->{'size_fractions'}}[$col_id] for gene $gene_id and read_length $read_length\n";
 					@{ @{ $result->{'data'} }[$row] }[ $col_number[$col_id] ]++;
 					$added = 1;
 					last;
 				}
 			}
-			unless ( $added ){
-				@{ @{ $result->{'data'} }[$row] }[ $col_number[@{$options->{'size_fractions'}}-1] ] ++;
+			unless ($added) {
+
+#			warn join( "\t", @bam_line )
+#			  . "\nI can add size 'larger' for gene $gene_id and read_length $read_length\n";
+				@{ @{ $result->{'data'} }[$row] }[ $col_number[-1] ]++;
 			}
 		}
 	}
 
 }
+
 sub get_matching_ids {
 	my ( $gtf, $chr, $start ) = @_;
 	my ( @IDS, $nextID );
@@ -302,19 +363,21 @@ sub get_matching_ids {
 	return @IDS;
 }
 
-
-sub get_reporter_hashes{
+sub get_reporter_hashes {
 	my ( $gtf, @lines ) = @_;
-	return &unique_hash(
-		map {
-			$gtf->get_line_asHash($_)
-		} @lines
-	);
+	return &unique_hash( map { $gtf->get_line_asHash($_) } @lines );
 }
 
-sub unique_hash{
+sub unique_hash {
 	my $h;
-	map { Carp::confess ( "missing $options->{'report_on'} in one \@_ entry\$exp = ".root->print_perl_var_def($_ ).";\n")unless ( defined $_->{$options->{'report_on'}}); $h->{$_->{$options->{'report_on'}}} = $_ } @_;
+	map {
+		Carp::confess(
+			    "missing $options->{'report_on'} in one \@_ entry\$exp = "
+			  . root->print_perl_var_def($_)
+			  . ";\n" )
+		  unless ( defined $_->{ $options->{'report_on'} } );
+		$h->{ $_->{ $options->{'report_on'} } } = $_
+	} @_;
 	return values %$h;
 }
 
@@ -333,6 +396,7 @@ sub unique {
 	map { $h->{$_}++ } @_;
 	return sort keys %$h;
 }
+
 sub lmax {
 	return 0 if ( @_ == 0 );
 	my $max = shift;
