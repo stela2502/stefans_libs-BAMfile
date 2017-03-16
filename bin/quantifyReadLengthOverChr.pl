@@ -153,7 +153,7 @@ sub filter {
 		print ".";
 	}
 
-	unless ( $bam_line[2] =~ m/chr/ ) {
+	if ( $bam_line[2] eq "*" ) {
 		@{ @{ $sample_table->{'data'} }[ $BAM_file->{'tmp_sample_row'} ] }[3]++;
 		return;
 	}
@@ -179,8 +179,11 @@ sub filter {
 	if ( abs( $bam_line[3] - $options->{'chr_position'} ) <= $options->{'chr_max_dist'} ){
 		&add_to_summary( $BAM_file->{'tmp_sample_name'}, $bam_line[2], $Seq );
 	}
-		
-
+	if ( length( $Seq ) > 40 ) {
+		my @row_numbers =
+		  $result->get_rowNumbers_4_columnName_and_Entry( 'Gene_ID', $bam_line[2] );
+		@{ @{ $result->{'data'} }[$row_numbers[0]] }[ $result->Header_Position( $bam_line[2]. " any read larger than 40" ) ] ++;
+	}
 }
 
 my $bam_file = stefans_libs::BAMfile->new();
@@ -194,7 +197,7 @@ foreach $sample_name (@bams) {
 			'larger'),
 			(map { "$sample_name from end $_" }
 			  @{ $options->{'size_fractions'} },
-			'larger')
+			'larger' ,'any read larger than 40')
 		]
 	);
 	$sample_row = undef;
