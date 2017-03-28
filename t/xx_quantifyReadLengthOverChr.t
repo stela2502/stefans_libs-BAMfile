@@ -42,4 +42,9 @@ foreach ( 'run1_sampleInfo.xls', 'run1.log', 'run1.xls' ) {
 	ok ( -f "$outpath/$_" , "outfile $outpath/$_");
 }
 
+@bams = ( $plugin_path."/data/Homo_sapiens_nm-tRNA-Tyr-GTA-chr21-2.bam");
+ok ( -f $bams[0], "defined bam file" );
+
+
+
 #print "\$exp = ".root->print_perl_var_def($value ).";\n";
