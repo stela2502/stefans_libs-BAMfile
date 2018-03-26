@@ -76,8 +76,12 @@ sub open_file {
 	my ( $self, $file ) = @_;
 	Carp::confess("Not a file '$file'\n$!\n") unless ( -f $file );
 	my $F;
+	if ( $file =~ m/sra$/ ) {
+		## Fuck lets hope that this is a 10x result bam file and not a fastq file
+		open( $F, "sam-dump $file |" ) or die "I could not start the sam-dump pipe!\n$!\n";
+	}
 	if ( $file =~ m/bam$/ ) {
-		open( $F, "samtools view -h $file |" );
+		open( $F, "samtools view -h $file |" ) or die "I could not open the samtools pipe!\n$!\n";
 	}
 	elsif ( $file =~ m/sam$/ ) {
 		open( $F, "<$file" );
