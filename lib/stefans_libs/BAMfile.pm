@@ -151,12 +151,24 @@ sub dropUMI_from_bam {
 sub filter_file {
 	my ( $self, $fname, $filter ) = @_;
 	my $file = $self->open_file($fname);
-
-	while (<$file>) {
-		chomp($_);
-		&{$filter}( $self, $_ );
-	}
 	
+	if ( $self->{'debug'} ){
+		my $i = 0;
+		while (<$file>) {
+			chomp($_);
+			&{$filter}( $self, $_ );
+			if ( $i ++ == 1000){
+				warn "BAMfile is in debug mode - stop after 1000 lines!\n";
+				last;
+			}
+		}
+	}
+	else {
+		while (<$file>) {
+			chomp($_);
+			&{$filter}( $self, $_ );
+		}
+	}
 	close($file);
 	return $self;
 }

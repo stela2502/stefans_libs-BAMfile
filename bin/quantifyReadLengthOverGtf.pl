@@ -344,7 +344,7 @@ sub get_matching_ids {
 		$nextID = pop(@IDS);
 		unless ( defined $nextID )
 		{      ## the end of the chromosome annotation data has been reached
-			$self->{'next_start'} = @{ @{ $gtf->{'__GeneFreeSplits__'} }[$gtf->get_chr_subID_4_start($chr,$start)] }[ 2 ];
+			$self->{'next_start'} = @{ @{ $gtf->{'__GeneFreeSplits__'}->{'data'} }[$gtf->get_chr_subID_4_start($chr,$start)] }[ 2 ];
 			return;
 		}
 		$self->{'next_start'} =
